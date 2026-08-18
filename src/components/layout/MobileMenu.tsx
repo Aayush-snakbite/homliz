@@ -1,0 +1,142 @@
+'use client';
+
+import React from 'react';
+import Link from 'next/link';
+import { X, MapPin, Building2, Home, Info, PhoneCall, PlusCircle, Search } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+interface MobileMenuProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 lg:hidden"
+          />
+
+          {/* Drawer */}
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed top-0 right-0 bottom-0 w-[85%] max-w-sm bg-[#0B111E] border-l border-white/10 p-6 z-50 flex flex-col justify-between overflow-y-auto lg:hidden"
+          >
+            <div>
+              {/* Header */}
+              <div className="flex items-center justify-between pb-6 border-b border-white/10">
+                <div className="flex items-center space-x-2">
+                  <div className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold p-2 rounded-lg text-lg">
+                    H
+                  </div>
+                  <div>
+                    <span className="text-xl font-bold tracking-tight text-white">HOMLIZ</span>
+                    <span className="text-[10px] uppercase tracking-wider text-emerald-400 block font-semibold">Gorakhpur, UP</span>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  aria-label="Close Mobile Menu"
+                  className="p-2 rounded-lg bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Navigation Links */}
+              <nav className="mt-8 space-y-2">
+                <Link
+                  href="/"
+                  onClick={onClose}
+                  className="flex items-center space-x-3 px-4 py-3 rounded-xl bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20"
+                >
+                  <Home className="w-5 h-5 text-emerald-400" />
+                  <span>Home</span>
+                </Link>
+
+                <Link
+                  href="/properties"
+                  onClick={onClose}
+                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  <Search className="w-5 h-5 text-slate-400" />
+                  <span>Search Properties</span>
+                </Link>
+
+                <Link
+                  href="/residential"
+                  onClick={onClose}
+                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  <Home className="w-5 h-5 text-slate-400" />
+                  <span>Residential Rentals</span>
+                </Link>
+
+                <Link
+                  href="/commercial"
+                  onClick={onClose}
+                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  <Building2 className="w-5 h-5 text-slate-400" />
+                  <span>Commercial Spaces</span>
+                </Link>
+
+                <Link
+                  href="/#areas"
+                  onClick={onClose}
+                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  <MapPin className="w-5 h-5 text-slate-400" />
+                  <span>Gorakhpur Localities</span>
+                </Link>
+
+                <Link
+                  href="/#why-us"
+                  onClick={onClose}
+                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  <Info className="w-5 h-5 text-slate-400" />
+                  <span>About HOMLIZ</span>
+                </Link>
+
+                <Link
+                  href="/#footer"
+                  onClick={onClose}
+                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  <PhoneCall className="w-5 h-5 text-slate-400" />
+                  <span>Contact</span>
+                </Link>
+              </nav>
+            </div>
+
+            {/* Bottom CTA */}
+            <div className="pt-6 border-t border-white/10 mt-8 space-y-4">
+              <button
+                onClick={onClose}
+                className="w-full flex items-center justify-center space-x-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold py-3.5 px-5 rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+              >
+                <PlusCircle className="w-5 h-5" />
+                <span>List Property</span>
+              </button>
+
+              <div className="text-center text-xs text-slate-400 pt-2">
+                Dedicated real-estate marketplace for Gorakhpur, UP
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
