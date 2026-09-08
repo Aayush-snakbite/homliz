@@ -2,8 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { X, MapPin, Building2, Home, Info, PhoneCall, PlusCircle, Search } from 'lucide-react';
+import { X, MapPin, Building2, Home, Info, PhoneCall, PlusCircle, Search, LogIn, UserPlus, LogOut, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface MobileMenuProps {
 }
 
 export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
+  const { user, isAuthenticated, logout } = useAuth();
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -53,8 +56,54 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
                 </button>
               </div>
 
+              {/* User Session Bar in Mobile Drawer */}
+              <div className="my-6">
+                {isAuthenticated && user ? (
+                  <div className="bg-[#0F1626] border border-white/10 p-4 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold flex items-center justify-center text-sm">
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-white block truncate max-w-[140px]">{user.name}</span>
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">{user.role}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        logout();
+                        onClose();
+                      }}
+                      className="p-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-colors"
+                      title="Log Out"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link
+                      href="/login"
+                      onClick={onClose}
+                      className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-slate-200 hover:text-white"
+                    >
+                      <LogIn className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Log In</span>
+                    </Link>
+                    <Link
+                      href="/signup"
+                      onClick={onClose}
+                      className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Sign Up</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+
               {/* Navigation Links */}
-              <nav className="mt-8 space-y-2">
+              <nav className="space-y-2">
                 <Link
                   href="/"
                   onClick={onClose}

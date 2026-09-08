@@ -2,12 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, PlusCircle, MapPin } from 'lucide-react';
+import { Menu, PlusCircle, MapPin, User, LogOut, ShieldCheck, Building, UserCheck } from 'lucide-react';
 import { MobileMenu } from './MobileMenu';
+import { useAuth } from '@/context/AuthContext';
 
 export const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const { user, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -87,8 +91,65 @@ export const Navbar: React.FC = () => {
               </Link>
             </nav>
 
-            {/* Right Action CTA */}
+            {/* Right Action CTA & Auth Status */}
             <div className="hidden lg:flex items-center space-x-4">
+              {isAuthenticated && user ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center space-x-2.5 bg-white/5 hover:bg-white/10 border border-white/10 px-3.5 py-2 rounded-xl transition-colors"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center font-bold text-xs">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="text-left">
+                      <span className="text-xs font-bold text-white block max-w-[120px] truncate leading-tight">
+                        {user.name}
+                      </span>
+                      <span className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider">
+                        {user.role}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {userMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-[#0F1626] border border-white/10 rounded-2xl shadow-2xl p-2 z-50">
+                      <div className="px-3 py-2 border-b border-white/10 mb-1">
+                        <span className="text-xs font-bold text-white block truncate">{user.name}</span>
+                        <span className="text-[10px] text-slate-400 block truncate">{user.email}</span>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          logout();
+                        }}
+                        className="w-full flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-semibold text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 transition-colors text-left"
+                      >
+                        <LogOut className="w-4 h-4 text-rose-400" />
+                        <span>Log Out</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <Link
+                    href="/login"
+                    className="text-xs font-bold text-slate-300 hover:text-white px-3 py-2 rounded-xl hover:bg-white/5 transition-colors"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl border border-white/10 transition-colors"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              )}
+
               <button className="flex items-center space-x-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold py-2.5 px-5 rounded-xl transition-all shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:-translate-y-0.5 text-sm">
                 <PlusCircle className="w-4 h-4" />
                 <span>List Property</span>
