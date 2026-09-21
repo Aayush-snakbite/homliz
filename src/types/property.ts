@@ -11,9 +11,12 @@ export type PropertySubType =
   | 'Showroom'
   | 'Commercial Floor'
   | 'Warehouse'
-  | 'Commercial Building';
+  | 'Commercial Building'
+  | 'Other';
 
 export type FurnishingStatus = 'Unfurnished' | 'Semi-Furnished' | 'Fully Furnished';
+
+export type OwnerPropertyStatus = 'Draft' | 'Pending Review' | 'Published';
 
 export interface Property {
   id: string;
@@ -24,10 +27,14 @@ export interface Property {
   securityDeposit?: number; // Deposit amount in INR
   location: string; // Locality name e.g., "Civil Lines"
   address: string;
+  pincode?: string;
   bedrooms?: number;
   bathrooms?: number;
   areaSqFt: number;
   furnishing?: FurnishingStatus;
+  floor?: number;
+  totalFloors?: number;
+  listingType?: 'Rent' | 'Lease';
   image: string;
   gallery?: string[]; // Array of high-res image URLs for details page
   isFeatured?: boolean;
@@ -35,6 +42,10 @@ export interface Property {
   description: string;
   amenities: string[];
   ownerType: 'Direct Owner' | 'Local Representative';
+  ownerId?: string; // Owner User ID
+  status?: OwnerPropertyStatus; // 'Draft' | 'Pending Review' | 'Published'
+  contactPhone?: string;
+  contactName?: string;
   availableFrom?: string;
   createdAt?: string; // Date string for sorting
 }

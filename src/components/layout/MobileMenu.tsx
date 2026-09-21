@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { X, MapPin, Building2, Home, Info, PhoneCall, PlusCircle, Search, LogIn, UserPlus, LogOut, User } from 'lucide-react';
+import { X, MapPin, Building2, Home, Info, PhoneCall, PlusCircle, Search, LogIn, UserPlus, LogOut, LayoutDashboard } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 
@@ -104,12 +104,23 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
 
               {/* Navigation Links */}
               <nav className="space-y-2">
+                {isAuthenticated && user?.role === 'property_owner' && (
+                  <Link
+                    href="/owner/dashboard"
+                    onClick={onClose}
+                    className="flex items-center space-x-3 px-4 py-3 rounded-xl bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 mb-2"
+                  >
+                    <LayoutDashboard className="w-5 h-5 text-emerald-400" />
+                    <span>Owner Dashboard</span>
+                  </Link>
+                )}
+
                 <Link
                   href="/"
                   onClick={onClose}
-                  className="flex items-center space-x-3 px-4 py-3 rounded-xl bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20"
+                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
                 >
-                  <Home className="w-5 h-5 text-emerald-400" />
+                  <Home className="w-5 h-5 text-slate-400" />
                   <span>Home</span>
                 </Link>
 
@@ -139,45 +150,19 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
                   <Building2 className="w-5 h-5 text-slate-400" />
                   <span>Commercial Spaces</span>
                 </Link>
-
-                <Link
-                  href="/#areas"
-                  onClick={onClose}
-                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
-                >
-                  <MapPin className="w-5 h-5 text-slate-400" />
-                  <span>Gorakhpur Localities</span>
-                </Link>
-
-                <Link
-                  href="/#why-us"
-                  onClick={onClose}
-                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
-                >
-                  <Info className="w-5 h-5 text-slate-400" />
-                  <span>About HOMLIZ</span>
-                </Link>
-
-                <Link
-                  href="/#footer"
-                  onClick={onClose}
-                  className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
-                >
-                  <PhoneCall className="w-5 h-5 text-slate-400" />
-                  <span>Contact</span>
-                </Link>
               </nav>
             </div>
 
             {/* Bottom CTA */}
             <div className="pt-6 border-t border-white/10 mt-8 space-y-4">
-              <button
+              <Link
+                href={user?.role === 'property_owner' ? '/owner/properties/new' : '/login'}
                 onClick={onClose}
                 className="w-full flex items-center justify-center space-x-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold py-3.5 px-5 rounded-xl transition-all shadow-lg shadow-emerald-500/20"
               >
                 <PlusCircle className="w-5 h-5" />
                 <span>List Property</span>
-              </button>
+              </Link>
 
               <div className="text-center text-xs text-slate-400 pt-2">
                 Dedicated real-estate marketplace for Gorakhpur, UP
