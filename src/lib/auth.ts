@@ -141,6 +141,34 @@ export const authService = {
     return newUser;
   },
 
+  // Update user profile info
+  updateProfile(updates: Partial<Pick<User, 'name' | 'email' | 'phone' | 'avatarUrl'>>): User | null {
+    const currentUser = this.getStoredUser();
+    if (!currentUser) return null;
+
+    const updatedUser: User = {
+      ...currentUser,
+      ...updates,
+    };
+
+    this.setStoredUser(updatedUser);
+
+    // Also update registered users array if present
+    if (typeof window !== 'undefined') {
+      const registered = localStorage.getItem(USERS_STORAGE_KEY);
+      if (registered) {
+        const users: User[] = JSON.parse(registered);
+        const idx = users.findIndex((u) => u.id === currentUser.id);
+        if (idx !== -1) {
+          users[idx] = updatedUser;
+          localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+        }
+      }
+    }
+
+    return updatedUser;
+  },
+
   // Logout
   async logout(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 200));

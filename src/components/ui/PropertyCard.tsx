@@ -1,16 +1,49 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { Property } from '@/types/property';
 import { MapPin, Bed, Bath, Maximize2, Heart, ArrowRight, Sofa } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { tenantDataService } from '@/lib/tenantData';
 
 interface PropertyCardProps {
   property: Property;
+  onRemove?: () => void;
 }
 
-export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
-  const [isLiked, setIsLiked] = useState(false);
+export const PropertyCard: React.FC<PropertyCardProps> = ({ property, onRemove }) => {
+  const { user, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const [isLiked, setIsLiked] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (user) {
+      setIsLiked(tenantDataService.isPropertySaved(user.id, property.id));
+    } else {
+      setIsLiked(false);
+    }
+  }, [user, property.id]);
+
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isAuthenticated || !user) {
+      router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+      return;
+    }
+
+    const nowSaved = tenantDataService.toggleSavedProperty(user.id, property.id);
+    setIsLiked(nowSaved);
+
+    if (!nowSaved && onRemove) {
+      onRemove();
+    }
+  };
 
   return (
     <div className="group bg-[#0F1626] border border-white/10 rounded-2xl overflow-hidden hover:border-emerald-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-emerald-500/5 flex flex-col h-full">
@@ -47,12 +80,13 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
 
         {/* Favorite Heart Button */}
         <button
-          onClick={(e) => {
-            e.preventDefault();
-            setIsLiked(!isLiked);
-          }}
+          onClick={handleFavoriteClick}
           aria-label="Save to favorites"
-          className="absolute top-3 right-3 p-2 rounded-full bg-slate-950/60 backdrop-blur-md text-white border border-white/10 hover:bg-emerald-500 hover:text-slate-950 transition-colors z-10"
+          className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md border transition-all z-10 ${
+            isLiked
+              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/50'
+              : 'bg-slate-950/60 text-white border-white/10 hover:bg-emerald-500 hover:text-slate-950'
+          }`}
         >
           <Heart className={`w-4 h-4 ${isLiked ? 'fill-emerald-400 text-emerald-400' : ''}`} />
         </button>

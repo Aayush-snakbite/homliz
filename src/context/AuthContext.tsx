@@ -9,6 +9,7 @@ interface AuthContextType extends AuthState {
   signup: (credentials: SignupCredentials) => Promise<User>;
   logout: () => Promise<void>;
   updateRole: (newRole: UserRole) => void;
+  updateProfile: (updates: Partial<Pick<User, 'name' | 'email' | 'phone' | 'avatarUrl'>>) => void;
   isTenant: boolean;
   isOwner: boolean;
   isAdmin: boolean;
@@ -89,6 +90,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setState((prev) => ({ ...prev, user: updated }));
   };
 
+  const updateProfile = (updates: Partial<Pick<User, 'name' | 'email' | 'phone' | 'avatarUrl'>>) => {
+    const updated = authService.updateProfile(updates);
+    if (updated) {
+      setState((prev) => ({ ...prev, user: updated }));
+    }
+  };
+
   const isTenant = state.user?.role === 'tenant';
   const isOwner = state.user?.role === 'property_owner';
   const isAdmin = state.user?.role === 'admin';
@@ -101,6 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signup,
         logout,
         updateRole,
+        updateProfile,
         isTenant,
         isOwner,
         isAdmin,

@@ -1,14 +1,18 @@
 'use client';
 
-import React, { useState, use } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { notFound } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PropertyGallery } from '@/components/ui/PropertyGallery';
 import { PropertyCard } from '@/components/ui/PropertyCard';
 import { ScheduleVisitModal } from '@/components/ui/ScheduleVisitModal';
-import { GORAKHPUR_PROPERTIES } from '@/data/properties';
+import { EnquireModal } from '@/components/ui/EnquireModal';
+import { useAuth } from '@/context/AuthContext';
+import { tenantDataService } from '@/lib/tenantData';
+import { Property } from '@/types/property';
 import {
   MapPin,
   Bed,
@@ -26,6 +30,8 @@ import {
   Sofa,
   Clock,
   IndianRupee,
+  Heart,
+  Send,
 } from 'lucide-react';
 
 interface PropertyDetailsPageProps {
@@ -34,10 +40,22 @@ interface PropertyDetailsPageProps {
 
 export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps) {
   const { id } = use(params);
-  const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user, isAuthenticated } = useAuth();
 
-  const property = GORAKHPUR_PROPERTIES.find((p) => p.id === id);
+  const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
+  const [isEnquireModalOpen, setIsEnquireModalOpen] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  const property = tenantDataService.getPropertyById(id);
+
+  useEffect(() => {
+    if (user && property) {
+      setIsSaved(tenantDataService.isPropertySaved(user.id, property.id));
+    }
+  }, [user, property]);
 
   if (!property) {
     notFound();
@@ -47,7 +65,8 @@ export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps
   const images = property.gallery && property.gallery.length > 0 ? property.gallery : [property.image];
 
   // Similar properties calculation
-  const similarProperties = GORAKHPUR_PROPERTIES.filter(
+  const allProps = tenantDataService.getAllProperties();
+  const similarProperties = allProps.filter(
     (p) => p.id !== property.id && (p.location === property.location || p.type === property.type)
   ).slice(0, 3);
 
@@ -117,8 +136,27 @@ export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps
               </div>
             </div>
 
-            {/* Share / Back Buttons */}
+            {/* Share / Favorite / Back Buttons */}
             <div className="flex items-center space-x-3 shrink-0">
+              <button
+                onClick={() => {
+                  if (!isAuthenticated || !user) {
+                    router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+                    return;
+                  }
+                  const now = tenantDataService.toggleSavedProperty(user.id, property.id);
+                  setIsSaved(now);
+                }}
+                className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl border text-xs font-semibold transition-colors ${
+                  isSaved
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-white/5 border-white/10 text-slate-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Heart className={`w-4 h-4 ${isSaved ? 'fill-emerald-400 text-emerald-400' : 'text-emerald-400'}`} />
+                <span>{isSaved ? 'Saved' : 'Save'}</span>
+              </button>
+
               <button
                 onClick={handleCopyShare}
                 className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
@@ -255,21 +293,36 @@ export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps
 
                 {/* CTA Action Buttons */}
                 <div className="space-y-3">
+                  {/* Direct Enquiry Modal Action */}
+                  <button
+                    onClick={() => {
+                      if (!isAuthenticated || !user) {
+                        router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+                        return;
+                      }
+                      setIsEnquireModalOpen(true);
+                    }}
+                    className="w-full flex items-center justify-center space-x-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3.5 px-4 rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Send Direct Enquiry</span>
+                  </button>
+
                   {/* WhatsApp Action */}
                   <a
                     href={whatsappUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center space-x-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3.5 px-4 rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20"
+                    className="w-full flex items-center justify-center space-x-2 bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-4 rounded-xl text-xs border border-white/10 transition-colors"
                   >
-                    <MessageCircle className="w-4 h-4" />
+                    <MessageCircle className="w-4 h-4 text-emerald-400" />
                     <span>Enquire via WhatsApp</span>
                   </a>
 
                   {/* Direct Call Action */}
                   <a
                     href="tel:+919876543210"
-                    className="w-full flex items-center justify-center space-x-2 bg-white/10 hover:bg-white/20 text-white font-bold py-3.5 px-4 rounded-xl text-xs border border-white/10 transition-colors"
+                    className="w-full flex items-center justify-center space-x-2 bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-4 rounded-xl text-xs border border-white/10 transition-colors"
                   >
                     <Phone className="w-4 h-4 text-emerald-400" />
                     <span>Call +91 98765 43210</span>
@@ -314,6 +367,13 @@ export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps
         onClose={() => setIsVisitModalOpen(false)}
         propertyTitle={property.title}
         propertyLocation={property.location}
+      />
+
+      {/* Direct Enquiry Modal Popup */}
+      <EnquireModal
+        isOpen={isEnquireModalOpen}
+        onClose={() => setIsEnquireModalOpen(false)}
+        property={property}
       />
 
       <Footer />

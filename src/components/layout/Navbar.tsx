@@ -131,6 +131,46 @@ export const Navbar: React.FC = () => {
                         </Link>
                       )}
 
+                      {user.role === 'tenant' && (
+                        <>
+                          <Link
+                            href="/tenant/dashboard"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                          >
+                            <LayoutDashboard className="w-4 h-4" />
+                            <span>Tenant Dashboard</span>
+                          </Link>
+
+                          <Link
+                            href="/tenant/favorites"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5 transition-colors"
+                          >
+                            <User className="w-4 h-4 text-emerald-400" />
+                            <span>Saved Properties</span>
+                          </Link>
+
+                          <Link
+                            href="/tenant/enquiries"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5 transition-colors"
+                          >
+                            <User className="w-4 h-4 text-indigo-400" />
+                            <span>My Enquiries</span>
+                          </Link>
+
+                          <Link
+                            href="/tenant/profile"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5 transition-colors mb-1"
+                          >
+                            <User className="w-4 h-4 text-slate-400" />
+                            <span>My Profile</span>
+                          </Link>
+                        </>
+                      )}
+
                       <button
                         onClick={() => {
                           setUserMenuOpen(false);
