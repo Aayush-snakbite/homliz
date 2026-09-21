@@ -6,7 +6,7 @@ import { Footer } from '@/components/layout/Footer';
 import { FilterSidebar } from '@/components/ui/FilterSidebar';
 import { FilterDrawer } from '@/components/ui/FilterDrawer';
 import { PropertyCard } from '@/components/ui/PropertyCard';
-import { GORAKHPUR_PROPERTIES } from '@/data/properties';
+import { tenantDataService } from '@/lib/tenantData';
 import { FilterState } from '@/types/property';
 import { Filter, Search, RotateCcw, X, Building2, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -31,7 +31,7 @@ export default function PropertiesPage() {
 
   // Dynamic filter engine
   const filteredProperties = useMemo(() => {
-    let result = [...GORAKHPUR_PROPERTIES];
+    let result = tenantDataService.getPublicProperties();
 
     // Keyword Search
     if (filters.searchQuery.trim()) {
@@ -119,7 +119,7 @@ export default function PropertiesPage() {
           {/* Controls Bar for Mobile & Results Counter */}
           <div className="flex items-center justify-between mb-6">
             <div className="text-xs text-slate-300 font-medium">
-              Showing <span className="text-emerald-400 font-bold">{filteredProperties.length}</span> of {GORAKHPUR_PROPERTIES.length} rental listings
+              Showing <span className="text-emerald-400 font-bold">{filteredProperties.length}</span> of {tenantDataService.getPublicProperties().length} rental listings
             </div>
 
             <button

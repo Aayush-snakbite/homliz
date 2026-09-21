@@ -131,6 +131,37 @@ export const Navbar: React.FC = () => {
                         </Link>
                       )}
 
+                      {user.role === 'admin' && (
+                        <>
+                          <Link
+                            href="/admin/dashboard"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                          >
+                            <LayoutDashboard className="w-4 h-4" />
+                            <span>Admin Dashboard</span>
+                          </Link>
+
+                          <Link
+                            href="/admin/properties/pending"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 hover:bg-amber-500/10 transition-colors"
+                          >
+                            <LayoutDashboard className="w-4 h-4" />
+                            <span>Pending Queue</span>
+                          </Link>
+
+                          <Link
+                            href="/admin/properties"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/5 transition-colors mb-1"
+                          >
+                            <LayoutDashboard className="w-4 h-4 text-slate-400" />
+                            <span>All Properties</span>
+                          </Link>
+                        </>
+                      )}
+
                       {user.role === 'tenant' && (
                         <>
                           <Link

@@ -104,6 +104,17 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
 
               {/* Navigation Links */}
               <nav className="space-y-2">
+                {isAuthenticated && user?.role === 'admin' && (
+                  <Link
+                    href="/admin/dashboard"
+                    onClick={onClose}
+                    className="flex items-center space-x-3 px-4 py-3 rounded-xl bg-[#0F1626] border border-emerald-500/40 text-emerald-300 font-bold mb-2"
+                  >
+                    <LayoutDashboard className="w-5 h-5 text-emerald-400" />
+                    <span>Admin Dashboard</span>
+                  </Link>
+                )}
+
                 {isAuthenticated && user?.role === 'property_owner' && (
                   <Link
                     href="/owner/dashboard"

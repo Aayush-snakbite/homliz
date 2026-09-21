@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PropertyCard } from '@/components/ui/PropertyCard';
-import { GORAKHPUR_PROPERTIES } from '@/data/properties';
+import { tenantDataService } from '@/lib/tenantData';
 import { Building2, Search, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -14,7 +14,7 @@ export default function CommercialPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const commercialProperties = useMemo(() => {
-    return GORAKHPUR_PROPERTIES.filter((p) => {
+    return tenantDataService.getPublicProperties().filter((p) => {
       if (p.type !== 'commercial') return false;
 
       // SubCategory filter

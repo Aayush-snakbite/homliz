@@ -6,7 +6,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { useAuth } from '@/context/AuthContext';
-import { ownerPropertiesService } from '@/lib/ownerProperties';
+import { ownerPropertiesService, isApprovedStatus, isPendingStatus, isRejectedStatus } from '@/lib/ownerProperties';
 import { Property } from '@/types/property';
 import {
   Building,
@@ -22,6 +22,7 @@ import {
   UserCheck,
   Building2,
   ArrowRight,
+  XCircle,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -37,9 +38,9 @@ function OwnerDashboardContent() {
   }, [user]);
 
   const totalCount = properties.length;
-  const publishedCount = properties.filter((p) => (p.status || 'Published') === 'Published').length;
-  const pendingCount = properties.filter((p) => p.status === 'Pending Review').length;
-  const draftCount = properties.filter((p) => p.status === 'Draft').length;
+  const publishedCount = properties.filter((p) => isApprovedStatus(p.status)).length;
+  const pendingCount = properties.filter((p) => isPendingStatus(p.status)).length;
+  const rejectedCount = properties.filter((p) => isRejectedStatus(p.status)).length;
 
   return (
     <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col">
@@ -95,11 +96,11 @@ function OwnerDashboardContent() {
 
             <div className="bg-[#0F1626] border border-white/10 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active / Published</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Approved / Live</span>
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               </div>
               <div className="text-2xl sm:text-3xl font-black text-emerald-400">{publishedCount}</div>
-              <p className="text-[10px] text-slate-400 mt-1">Live on Gorakhpur catalog</p>
+              <p className="text-[10px] text-slate-400 mt-1">Visible on Gorakhpur catalog</p>
             </div>
 
             <div className="bg-[#0F1626] border border-white/10 rounded-2xl p-5">
@@ -108,16 +109,16 @@ function OwnerDashboardContent() {
                 <Clock className="w-4 h-4 text-amber-400" />
               </div>
               <div className="text-2xl sm:text-3xl font-black text-amber-300">{pendingCount}</div>
-              <p className="text-[10px] text-slate-400 mt-1">Under team verification</p>
+              <p className="text-[10px] text-slate-400 mt-1">Under admin verification</p>
             </div>
 
             <div className="bg-[#0F1626] border border-white/10 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Drafts</span>
-                <FileText className="w-4 h-4 text-slate-400" />
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Rejected</span>
+                <XCircle className="w-4 h-4 text-rose-400" />
               </div>
-              <div className="text-2xl sm:text-3xl font-black text-slate-300">{draftCount}</div>
-              <p className="text-[10px] text-slate-400 mt-1">Incomplete submissions</p>
+              <div className="text-2xl sm:text-3xl font-black text-rose-400">{rejectedCount}</div>
+              <p className="text-[10px] text-slate-400 mt-1">Needs editing or review</p>
             </div>
           </div>
 
@@ -139,7 +140,11 @@ function OwnerDashboardContent() {
           {properties.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {properties.map((property, idx) => {
-                const status = property.status || 'Published';
+                const isApp = isApprovedStatus(property.status);
+                const isPend = isPendingStatus(property.status);
+                const isRej = isRejectedStatus(property.status);
+                const statusLabel = isPend ? 'Pending Review' : isApp ? 'Approved' : 'Rejected';
+
                 return (
                   <motion.div
                     key={property.id}
@@ -162,14 +167,14 @@ function OwnerDashboardContent() {
                         <div className="absolute top-3 left-3">
                           <span
                             className={`text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-md ${
-                              status === 'Published'
+                              isApp
                                 ? 'bg-emerald-500/90 text-slate-950'
-                                : status === 'Pending Review'
+                                : isPend
                                 ? 'bg-amber-500/90 text-slate-950'
-                                : 'bg-slate-700/90 text-white'
+                                : 'bg-rose-500/90 text-white'
                             }`}
                           >
-                            {status}
+                            {statusLabel}
                           </span>
                         </div>
 
@@ -192,7 +197,7 @@ function OwnerDashboardContent() {
                           {property.title}
                         </h3>
 
-                        <div className="flex items-center space-x-3 text-xs text-slate-400">
+                        <div className="flex items-center space-x-3 text-xs text-slate-400 mb-2">
                           <span>{property.subType}</span>
                           <span>•</span>
                           <span>{property.areaSqFt} sq ft</span>
@@ -203,6 +208,12 @@ function OwnerDashboardContent() {
                             </>
                           )}
                         </div>
+
+                        {isRej && property.rejectionReason && (
+                          <div className="mt-2 text-[11px] p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300">
+                            <strong>Note:</strong> {property.rejectionReason}
+                          </div>
+                        )}
                       </div>
                     </div>
 

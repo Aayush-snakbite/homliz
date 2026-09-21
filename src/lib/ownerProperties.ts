@@ -1,8 +1,26 @@
-import { Property } from '@/types/property';
+import { Property, OwnerPropertyStatus } from '@/types/property';
 import { GORAKHPUR_PROPERTIES } from '@/data/properties';
 import { IMAGES } from '@/lib/images';
 
 const OWNER_STORAGE_KEY = 'homliz_owner_properties_v1';
+
+export const isApprovedStatus = (status?: OwnerPropertyStatus): boolean => {
+  if (!status) return true; // Legacy seed properties are approved by default
+  const lower = status.toLowerCase();
+  return lower === 'approved' || lower === 'published';
+};
+
+export const isPendingStatus = (status?: OwnerPropertyStatus): boolean => {
+  if (!status) return false;
+  const lower = status.toLowerCase();
+  return lower === 'pending review' || lower === 'pending';
+};
+
+export const isRejectedStatus = (status?: OwnerPropertyStatus): boolean => {
+  if (!status) return false;
+  const lower = status.toLowerCase();
+  return lower === 'rejected';
+};
 
 export const ownerPropertiesService = {
   // Get all custom owner properties stored in localStorage
@@ -34,7 +52,7 @@ export const ownerPropertiesService = {
         ? GORAKHPUR_PROPERTIES.slice(0, 4).map((p) => ({
             ...p,
             ownerId: 'user-owner-202',
-            status: (p.status || 'Published') as Property['status'],
+            status: (p.status || 'Approved') as Property['status'],
           }))
         : [];
 
@@ -51,7 +69,7 @@ export const ownerPropertiesService = {
     return all.find((p) => p.id === id) || null;
   },
 
-  // Add a brand new owner listing
+  // Add a brand new owner listing (starts as Pending Review)
   addOwnerProperty(
     propertyData: Omit<Property, 'id' | 'createdAt'>,
     ownerId: string
@@ -60,7 +78,7 @@ export const ownerPropertiesService = {
       ...propertyData,
       id: `prop-owner-${Date.now()}`,
       ownerId,
-      status: propertyData.status || 'Pending Review',
+      status: 'Pending Review',
       image: propertyData.image || IMAGES.properties.p1,
       createdAt: new Date().toISOString().split('T')[0],
     };
@@ -72,7 +90,7 @@ export const ownerPropertiesService = {
     return newProperty;
   },
 
-  // Update existing owner listing
+  // Update existing owner listing (reverts status to Pending Review for re-moderation)
   updateOwnerProperty(
     id: string,
     updatedData: Partial<Property>,
@@ -87,6 +105,8 @@ export const ownerPropertiesService = {
         ...updatedData,
         id,
         ownerId,
+        status: 'Pending Review', // Rule: edited property reverts to Pending Review
+        rejectionReason: undefined,
       };
       list[index] = updatedItem;
       this.saveStoredProperties(list);
@@ -101,11 +121,69 @@ export const ownerPropertiesService = {
         ...updatedData,
         id,
         ownerId,
-        status: (updatedData.status || demoMatch.status || 'Published') as Property['status'],
+        status: 'Pending Review',
+        rejectionReason: undefined,
       };
       const updated = [newOverride, ...list];
       this.saveStoredProperties(updated);
       return newOverride;
+    }
+
+    return null;
+  },
+
+  // Admin moderation: Approve property
+  approveProperty(id: string): Property | null {
+    const list = this.getStoredProperties();
+    const index = list.findIndex((p) => p.id === id);
+
+    if (index !== -1) {
+      list[index].status = 'Approved';
+      delete list[index].rejectionReason;
+      this.saveStoredProperties(list);
+      return list[index];
+    }
+
+    // If approving a demo seed property that wasn't in custom list yet
+    const demoMatch = GORAKHPUR_PROPERTIES.find((p) => p.id === id);
+    if (demoMatch) {
+      const override: Property = {
+        ...demoMatch,
+        status: 'Approved',
+      };
+      const updated = [override, ...list];
+      this.saveStoredProperties(updated);
+      return override;
+    }
+
+    return null;
+  },
+
+  // Admin moderation: Reject property
+  rejectProperty(id: string, reason?: string): Property | null {
+    const list = this.getStoredProperties();
+    const index = list.findIndex((p) => p.id === id);
+
+    if (index !== -1) {
+      list[index].status = 'Rejected';
+      if (reason) {
+        list[index].rejectionReason = reason;
+      }
+      this.saveStoredProperties(list);
+      return list[index];
+    }
+
+    // If rejecting a demo seed property
+    const demoMatch = GORAKHPUR_PROPERTIES.find((p) => p.id === id);
+    if (demoMatch) {
+      const override: Property = {
+        ...demoMatch,
+        status: 'Rejected',
+        rejectionReason: reason,
+      };
+      const updated = [override, ...list];
+      this.saveStoredProperties(updated);
+      return override;
     }
 
     return null;

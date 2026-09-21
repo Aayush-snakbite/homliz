@@ -16,7 +16,15 @@ export type PropertySubType =
 
 export type FurnishingStatus = 'Unfurnished' | 'Semi-Furnished' | 'Fully Furnished';
 
-export type OwnerPropertyStatus = 'Draft' | 'Pending Review' | 'Published';
+export type OwnerPropertyStatus =
+  | 'Pending Review'
+  | 'Approved'
+  | 'Rejected'
+  | 'Published'
+  | 'Draft'
+  | 'pending'
+  | 'approved'
+  | 'rejected';
 
 export interface Property {
   id: string;
@@ -43,7 +51,8 @@ export interface Property {
   amenities: string[];
   ownerType: 'Direct Owner' | 'Local Representative';
   ownerId?: string; // Owner User ID
-  status?: OwnerPropertyStatus; // 'Draft' | 'Pending Review' | 'Published'
+  status?: OwnerPropertyStatus;
+  rejectionReason?: string; // Optional moderation note
   contactPhone?: string;
   contactName?: string;
   availableFrom?: string;

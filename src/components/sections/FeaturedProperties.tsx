@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { GORAKHPUR_PROPERTIES } from '@/data/properties';
+import { tenantDataService } from '@/lib/tenantData';
 import { PropertyCard } from '../ui/PropertyCard';
 import { FilterState } from '@/types/property';
 import { Building2, Home, Sparkles, FilterX } from 'lucide-react';
@@ -17,7 +17,7 @@ export const FeaturedProperties: React.FC<FeaturedPropertiesProps> = ({ external
 
   // Filter properties dynamically
   const filteredProperties = useMemo(() => {
-    return GORAKHPUR_PROPERTIES.filter((prop) => {
+    return tenantDataService.getPublicProperties().filter((prop) => {
       // External search bar override
       if (externalFilter) {
         if (externalFilter.propertyType !== 'all' && prop.type !== externalFilter.propertyType) {
@@ -71,7 +71,7 @@ export const FeaturedProperties: React.FC<FeaturedPropertiesProps> = ({ external
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
             >
-              All Listings ({GORAKHPUR_PROPERTIES.length})
+              All Listings ({tenantDataService.getPublicProperties().length})
             </button>
             <button
               onClick={() => setActiveTab('residential')}

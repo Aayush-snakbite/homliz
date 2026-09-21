@@ -148,7 +148,7 @@ function EditPropertyContent({ id }: EditPropertyContentProps) {
           totalFloors,
           rent,
           securityDeposit,
-          status,
+          status: 'Pending Review',
           amenities: selectedAmenities,
           description: description.trim(),
           contactName: contactName.trim(),

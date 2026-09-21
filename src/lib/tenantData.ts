@@ -1,7 +1,7 @@
 import { Property } from '@/types/property';
 import { SavedProperty, PropertyEnquiry } from '@/types/tenant';
 import { GORAKHPUR_PROPERTIES } from '@/data/properties';
-import { ownerPropertiesService } from './ownerProperties';
+import { ownerPropertiesService, isApprovedStatus } from './ownerProperties';
 
 const SAVED_PROPERTIES_KEY = 'homliz_saved_properties_v1';
 const ENQUIRIES_KEY = 'homliz_enquiries_v1';
@@ -13,6 +13,11 @@ export const tenantDataService = {
     const customIds = new Set(customProps.map((p) => p.id));
     const demoFiltered = GORAKHPUR_PROPERTIES.filter((p) => !customIds.has(p.id));
     return [...customProps, ...demoFiltered];
+  },
+
+  // Get only approved properties for public browsing
+  getPublicProperties(): Property[] {
+    return this.getAllProperties().filter((p) => isApprovedStatus(p.status));
   },
 
   // Find a single property by ID across all sources
