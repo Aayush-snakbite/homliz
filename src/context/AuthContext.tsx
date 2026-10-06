@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole, LoginCredentials, SignupCredentials, AuthState } from '@/types/auth';
 import { authService, SignupResponse } from '@/lib/auth';
+import { onSupabaseAuthStateChange } from '@/lib/supabase';
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<User>;
@@ -25,15 +26,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error: null,
   });
 
-  // Restore stored session on mount
+  // Initialize Real Supabase Auth session & listen for session lifecycle events
   useEffect(() => {
-    const user = authService.getStoredUser();
-    setState({
-      user,
-      isAuthenticated: !!user,
-      isLoading: false,
-      error: null,
+    let mounted = true;
+
+    // 1. Initial session restoration from Supabase Auth & public.profiles
+    const initAuth = async () => {
+      try {
+        const user = await authService.getCurrentSessionUser();
+        if (mounted) {
+          setState({
+            user,
+            isAuthenticated: !!user,
+            isLoading: false,
+            error: null,
+          });
+        }
+      } catch {
+        if (mounted) {
+          const user = authService.getStoredUser();
+          setState({
+            user,
+            isAuthenticated: !!user,
+            isLoading: false,
+            error: null,
+          });
+        }
+      }
+    };
+
+    initAuth();
+
+    // 2. Subscribe to Supabase auth state change events
+    const { unsubscribe } = onSupabaseAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        authService.setStoredUser(null);
+        setState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+        });
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        const user = await authService.getCurrentSessionUser();
+        if (mounted) {
+          setState({
+            user,
+            isAuthenticated: !!user,
+            isLoading: false,
+            error: null,
+          });
+        }
+      }
     });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<User> => {

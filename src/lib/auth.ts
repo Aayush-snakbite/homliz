@@ -1,5 +1,6 @@
 import { User, UserRole, LoginCredentials, SignupCredentials } from '@/types/auth';
 import {
+  getSupabaseSession,
   supabaseSignInWithPassword,
   supabaseSignUp,
   supabaseSignOut,
@@ -71,6 +72,33 @@ export const authService = {
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
+  },
+
+  // Resolve current active Supabase Auth user & PostgreSQL Profile
+  async getCurrentSessionUser(): Promise<User | null> {
+    try {
+      const { session } = await getSupabaseSession();
+      if (session?.user) {
+        const { profile } = await ensureUserProfile(session.user);
+        const authoritativeRole: UserRole = profile?.role || 'tenant';
+        const appUser: User = {
+          id: session.user.id, // Primary key MUST equal auth.users.id
+          name: profile?.full_name || (session.user.user_metadata?.name as string) || session.user.email?.split('@')[0] || 'HOMLIZ User',
+          email: profile?.email || session.user.email || '',
+          phone: profile?.phone || (session.user.user_metadata?.phone as string) || '',
+          role: authoritativeRole, // Authoritative role from database
+          avatarUrl: profile?.avatar_url || undefined,
+          createdAt: profile?.created_at ? profile.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+        };
+        this.setStoredUser(appUser);
+        return appUser;
+      }
+    } catch {
+      // Fall through to stored user check
+    }
+
+    // Fallback for placeholder demo accounts when Supabase is in placeholder mode
+    return this.getStoredUser();
   },
 
   // Login with Supabase Auth & PostgreSQL Profiles Table Synchronization
