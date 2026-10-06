@@ -2,11 +2,11 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole, LoginCredentials, SignupCredentials, AuthState } from '@/types/auth';
-import { authService } from '@/lib/auth';
+import { authService, SignupResponse } from '@/lib/auth';
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<User>;
-  signup: (credentials: SignupCredentials) => Promise<User>;
+  signup: (credentials: SignupCredentials) => Promise<SignupResponse>;
   logout: () => Promise<void>;
   updateRole: (newRole: UserRole) => void;
   updateProfile: (updates: Partial<Pick<User, 'name' | 'email' | 'phone' | 'avatarUrl'>>) => void;
@@ -47,26 +47,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error: null,
       });
       return user;
-    } catch (err: any) {
-      const msg = err.message || 'Login failed. Please check credentials.';
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Login failed. Please check credentials.';
       setState((prev) => ({ ...prev, isLoading: false, error: msg }));
       throw err;
     }
   };
 
-  const signup = async (credentials: SignupCredentials): Promise<User> => {
+  const signup = async (credentials: SignupCredentials): Promise<SignupResponse> => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
-      const user = await authService.signup(credentials);
-      setState({
-        user,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      });
-      return user;
-    } catch (err: any) {
-      const msg = err.message || 'Registration failed.';
+      const res = await authService.signup(credentials);
+      if (res.requiresEmailConfirmation || !res.user) {
+        setState((prev) => ({
+          ...prev,
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+        }));
+      } else {
+        setState({
+          user: res.user,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        });
+      }
+      return res;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration failed.';
       setState((prev) => ({ ...prev, isLoading: false, error: msg }));
       throw err;
     }

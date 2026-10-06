@@ -1,4 +1,10 @@
 import { User, UserRole, LoginCredentials, SignupCredentials } from '@/types/auth';
+import {
+  supabaseSignInWithPassword,
+  supabaseSignUp,
+  supabaseSignOut,
+} from './supabase/auth';
+import { isSupabaseConfigured } from './supabase/client';
 
 const STORAGE_KEY = 'homliz_auth_session_v1';
 const USERS_STORAGE_KEY = 'homliz_registered_users_v1';
@@ -34,12 +40,17 @@ export const DEMO_ACCOUNTS: Record<UserRole, User> = {
   },
 };
 
+export interface SignupResponse {
+  user: User | null;
+  requiresEmailConfirmation: boolean;
+  message?: string;
+}
+
 /**
- * Mock authentication service layer.
- * Designed to be easily replaced by Supabase / NextAuth / Firebase without modifying UI.
+ * Authentication service layer integrated with Supabase Auth for Login & Signup.
  */
 export const authService = {
-  // Get active session from localStorage
+  // Get active session from localStorage (local UI state bridge)
   getStoredUser(): User | null {
     if (typeof window === 'undefined') return null;
     try {
@@ -60,49 +71,73 @@ export const authService = {
     }
   },
 
-  // Mock login with network delay simulation
+  // Login with Supabase Auth
   async login(credentials: LoginCredentials): Promise<User> {
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
     const query = credentials.emailOrPhone.toLowerCase().trim();
+    const isEmail = query.includes('@');
 
-    // Check demo accounts
-    if (query === 'tenant@homliz.com' || query === 'tenant') {
+    // Attempt real Supabase Auth
+    if (isEmail && credentials.password) {
+      const sbRes = await supabaseSignInWithPassword(query, credentials.password);
+
+      if (sbRes.error) {
+        // Fallback for demo accounts if Supabase credentials are placeholder
+        if (!isSupabaseConfigured() && (query === 'tenant@homliz.com' || query === 'owner@homliz.com' || query === 'admin@homliz.com')) {
+          return this.loginDemoAccount(query, credentials.role);
+        }
+
+        let errorMsg = sbRes.error.message;
+        if (errorMsg.includes('Invalid login credentials')) {
+          errorMsg = 'Invalid email or password. Please check your credentials.';
+        } else if (errorMsg.includes('Email not confirmed')) {
+          errorMsg = 'Email confirmation required. Please check your inbox.';
+        }
+        throw new Error(errorMsg);
+      }
+
+      if (sbRes.user) {
+        const role: UserRole = credentials.role === 'admin' ? 'tenant' : (credentials.role || 'tenant');
+        const appUser: User = {
+          id: sbRes.user.id,
+          name: (sbRes.user.user_metadata?.name as string) || query.split('@')[0],
+          email: sbRes.user.email || query,
+          phone: (sbRes.user.user_metadata?.phone as string) || '+91 98765 43210',
+          role,
+          createdAt: sbRes.user.created_at ? sbRes.user.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+        };
+        this.setStoredUser(appUser);
+        return appUser;
+      }
+    }
+
+    // Demo account / fallback check if phone or no password provided
+    if (!isSupabaseConfigured() || query === 'tenant' || query === 'owner' || query === 'admin') {
+      return this.loginDemoAccount(query, credentials.role);
+    }
+
+    throw new Error('Invalid email or password. Please enter valid credentials.');
+  },
+
+  // Helper for demo login fallback when Supabase is in placeholder mode
+  async loginDemoAccount(query: string, requestedRole?: UserRole): Promise<User> {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    if (query.includes('tenant')) {
       const u = DEMO_ACCOUNTS.tenant;
       this.setStoredUser(u);
       return u;
     }
-    if (query === 'owner@homliz.com' || query === 'owner') {
+    if (query.includes('owner')) {
       const u = DEMO_ACCOUNTS.property_owner;
       this.setStoredUser(u);
       return u;
     }
-    if (query === 'admin@homliz.com' || query === 'admin') {
+    if (query.includes('admin')) {
       const u = DEMO_ACCOUNTS.admin;
       this.setStoredUser(u);
       return u;
     }
 
-    // Check custom registered users from localStorage
-    if (typeof window !== 'undefined') {
-      const registered = localStorage.getItem(USERS_STORAGE_KEY);
-      if (registered) {
-        const users: User[] = JSON.parse(registered);
-        const match = users.find(
-          (u) => u.email.toLowerCase() === query || u.phone.replaceAll(' ', '') === query.replaceAll(' ', '')
-        );
-        if (match) {
-          this.setStoredUser(match);
-          return match;
-        }
-      }
-    }
-
-    // Fallback: create dynamic user for any email/phone entered
-    const isOwner = credentials.role === 'property_owner';
-    const isAdmin = credentials.role === 'admin';
-    const role: UserRole = isAdmin ? 'admin' : isOwner ? 'property_owner' : 'tenant';
-
+    const role: UserRole = requestedRole === 'admin' ? 'admin' : requestedRole === 'property_owner' ? 'property_owner' : 'tenant';
     const newUser: User = {
       id: `user-${Date.now()}`,
       name: query.includes('@') ? query.split('@')[0] : 'Gorakhpur User',
@@ -111,25 +146,78 @@ export const authService = {
       role,
       createdAt: new Date().toISOString().split('T')[0],
     };
-
     this.setStoredUser(newUser);
     return newUser;
   },
 
-  // Mock signup
-  async signup(credentials: SignupCredentials): Promise<User> {
-    await new Promise((resolve) => setTimeout(resolve, 700));
+  // Signup with Supabase Auth
+  async signup(credentials: SignupCredentials): Promise<SignupResponse> {
+    // Strictly prevent admin self-registration
+    const assignedRole: UserRole = credentials.role === 'admin' ? 'tenant' : credentials.role;
 
+    if (credentials.email && credentials.password) {
+      const sbRes = await supabaseSignUp(credentials.email, credentials.password, {
+        data: {
+          name: credentials.name,
+          phone: credentials.phone,
+        },
+      });
+
+      if (sbRes.error) {
+        if (!isSupabaseConfigured()) {
+          return this.signupDemoFallback(credentials, assignedRole);
+        }
+
+        let errorMsg = sbRes.error.message;
+        if (errorMsg.includes('User already registered') || errorMsg.includes('already exists')) {
+          errorMsg = 'This email address is already registered. Please log in instead.';
+        } else if (errorMsg.includes('Password should be at least')) {
+          errorMsg = 'Password must be at least 6 characters long.';
+        }
+        throw new Error(errorMsg);
+      }
+
+      // If user created but no active session -> email confirmation required
+      if (sbRes.user && !sbRes.session) {
+        return {
+          user: null,
+          requiresEmailConfirmation: true,
+          message: 'Account created. Please check your email to confirm your account.',
+        };
+      }
+
+      if (sbRes.user && sbRes.session) {
+        const appUser: User = {
+          id: sbRes.user.id,
+          name: credentials.name.trim(),
+          email: credentials.email.trim(),
+          phone: credentials.phone.trim(),
+          role: assignedRole,
+          createdAt: new Date().toISOString().split('T')[0],
+        };
+        this.setStoredUser(appUser);
+        return {
+          user: appUser,
+          requiresEmailConfirmation: false,
+        };
+      }
+    }
+
+    return this.signupDemoFallback(credentials, assignedRole);
+  },
+
+  // Signup demo fallback when Supabase credentials are placeholder
+  async signupDemoFallback(credentials: SignupCredentials, assignedRole: UserRole): Promise<SignupResponse> {
+    await new Promise((resolve) => setTimeout(resolve, 400));
     const newUser: User = {
       id: `user-${Date.now()}`,
       name: credentials.name.trim(),
       email: credentials.email.trim(),
       phone: credentials.phone.trim(),
-      role: credentials.role,
+      role: assignedRole,
       createdAt: new Date().toISOString().split('T')[0],
     };
 
-    // Store in registered users array
     if (typeof window !== 'undefined') {
       const registered = localStorage.getItem(USERS_STORAGE_KEY);
       const list: User[] = registered ? JSON.parse(registered) : [];
@@ -138,7 +226,10 @@ export const authService = {
     }
 
     this.setStoredUser(newUser);
-    return newUser;
+    return {
+      user: newUser,
+      requiresEmailConfirmation: false,
+    };
   },
 
   // Update user profile info
@@ -153,7 +244,6 @@ export const authService = {
 
     this.setStoredUser(updatedUser);
 
-    // Also update registered users array if present
     if (typeof window !== 'undefined') {
       const registered = localStorage.getItem(USERS_STORAGE_KEY);
       if (registered) {
@@ -169,9 +259,9 @@ export const authService = {
     return updatedUser;
   },
 
-  // Logout
+  // Logout with Supabase Auth
   async logout(): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await supabaseSignOut();
     this.setStoredUser(null);
   },
 };

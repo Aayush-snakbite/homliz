@@ -35,11 +35,13 @@ export default function SignupPage() {
   const [agreedTerms, setAgreedTerms] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setInfoMessage(null);
 
     if (!name.trim()) {
       setError('Please enter your full name.');
@@ -68,16 +70,23 @@ export default function SignupPage() {
 
     setIsLoading(true);
     try {
-      await signup({
+      const assignedRole: UserRole = role === 'admin' ? 'tenant' : role;
+      const res = await signup({
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
         password,
-        role,
+        role: assignedRole,
       });
-      router.push('/');
-    } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+
+      if (res.requiresEmailConfirmation) {
+        setInfoMessage(res.message || 'Account created. Please check your email to confirm your account.');
+      } else {
+        router.push('/');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration failed. Please try again.';
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -165,6 +174,14 @@ export default function SignupPage() {
               </button>
             </div>
           </div>
+
+          {/* Info Banner for Email Confirmation */}
+          {infoMessage && (
+            <div className="mb-6 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start space-x-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <span>{infoMessage}</span>
+            </div>
+          )}
 
           {/* Error Banner */}
           {error && (
