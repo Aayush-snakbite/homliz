@@ -3,7 +3,9 @@ import {
   supabaseSignInWithPassword,
   supabaseSignUp,
   supabaseSignOut,
-} from './supabase/auth';
+  ensureUserProfile,
+  updateUserProfile,
+} from './supabase';
 import { isSupabaseConfigured } from './supabase/client';
 
 const STORAGE_KEY = 'homliz_auth_session_v1';
@@ -47,10 +49,10 @@ export interface SignupResponse {
 }
 
 /**
- * Authentication service layer integrated with Supabase Auth for Login & Signup.
+ * Authentication & Profile service layer integrated with Supabase Auth & public.profiles.
  */
 export const authService = {
-  // Get active session from localStorage (local UI state bridge)
+  // Get active session from localStorage (local UI compatibility state bridge)
   getStoredUser(): User | null {
     if (typeof window === 'undefined') return null;
     try {
@@ -71,7 +73,7 @@ export const authService = {
     }
   },
 
-  // Login with Supabase Auth
+  // Login with Supabase Auth & PostgreSQL Profiles Table Synchronization
   async login(credentials: LoginCredentials): Promise<User> {
     const query = credentials.emailOrPhone.toLowerCase().trim();
     const isEmail = query.includes('@');
@@ -96,15 +98,22 @@ export const authService = {
       }
 
       if (sbRes.user) {
-        const role: UserRole = credentials.role === 'admin' ? 'tenant' : (credentials.role || 'tenant');
+        // Ensure profile exists in public.profiles table using auth.users.id
+        const { profile } = await ensureUserProfile(sbRes.user);
+
+        // Authoritative role comes directly from PostgreSQL public.profiles
+        const authoritativeRole: UserRole = profile?.role || 'tenant';
+
         const appUser: User = {
-          id: sbRes.user.id,
-          name: (sbRes.user.user_metadata?.name as string) || query.split('@')[0],
-          email: sbRes.user.email || query,
-          phone: (sbRes.user.user_metadata?.phone as string) || '+91 98765 43210',
-          role,
-          createdAt: sbRes.user.created_at ? sbRes.user.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+          id: sbRes.user.id, // Primary key MUST equal auth.users.id
+          name: profile?.full_name || (sbRes.user.user_metadata?.name as string) || query.split('@')[0],
+          email: profile?.email || sbRes.user.email || query,
+          phone: profile?.phone || (sbRes.user.user_metadata?.phone as string) || '',
+          role: authoritativeRole, // Authoritative role from database
+          avatarUrl: profile?.avatar_url || undefined,
+          createdAt: profile?.created_at ? profile.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
         };
+
         this.setStoredUser(appUser);
         return appUser;
       }
@@ -150,22 +159,23 @@ export const authService = {
     return newUser;
   },
 
-  // Signup with Supabase Auth
+  // Signup with Supabase Auth & PostgreSQL Profile Creation
   async signup(credentials: SignupCredentials): Promise<SignupResponse> {
     // Strictly prevent admin self-registration
-    const assignedRole: UserRole = credentials.role === 'admin' ? 'tenant' : credentials.role;
+    const sanitizedRole: UserRole = credentials.role === 'admin' ? 'tenant' : credentials.role;
 
     if (credentials.email && credentials.password) {
       const sbRes = await supabaseSignUp(credentials.email, credentials.password, {
         data: {
           name: credentials.name,
           phone: credentials.phone,
+          requested_role: sanitizedRole,
         },
       });
 
       if (sbRes.error) {
         if (!isSupabaseConfigured()) {
-          return this.signupDemoFallback(credentials, assignedRole);
+          return this.signupDemoFallback(credentials, sanitizedRole);
         }
 
         let errorMsg = sbRes.error.message;
@@ -187,14 +197,19 @@ export const authService = {
       }
 
       if (sbRes.user && sbRes.session) {
+        // Ensure profile row created in public.profiles with role = 'tenant'
+        const { profile } = await ensureUserProfile(sbRes.user);
+        const authoritativeRole: UserRole = profile?.role || 'tenant';
+
         const appUser: User = {
           id: sbRes.user.id,
-          name: credentials.name.trim(),
-          email: credentials.email.trim(),
-          phone: credentials.phone.trim(),
-          role: assignedRole,
+          name: profile?.full_name || credentials.name.trim(),
+          email: profile?.email || credentials.email.trim(),
+          phone: profile?.phone || credentials.phone.trim(),
+          role: authoritativeRole,
           createdAt: new Date().toISOString().split('T')[0],
         };
+
         this.setStoredUser(appUser);
         return {
           user: appUser,
@@ -203,7 +218,7 @@ export const authService = {
       }
     }
 
-    return this.signupDemoFallback(credentials, assignedRole);
+    return this.signupDemoFallback(credentials, sanitizedRole);
   },
 
   // Signup demo fallback when Supabase credentials are placeholder
@@ -232,7 +247,7 @@ export const authService = {
     };
   },
 
-  // Update user profile info
+  // Update user profile info in local storage and PostgreSQL public.profiles
   updateProfile(updates: Partial<Pick<User, 'name' | 'email' | 'phone' | 'avatarUrl'>>): User | null {
     const currentUser = this.getStoredUser();
     if (!currentUser) return null;
@@ -243,6 +258,17 @@ export const authService = {
     };
 
     this.setStoredUser(updatedUser);
+
+    // Synchronize updates to PostgreSQL public.profiles asynchronously if user has a valid UUID
+    if (currentUser.id && currentUser.id.length > 20) {
+      updateUserProfile(currentUser.id, {
+        full_name: updates.name,
+        phone: updates.phone,
+        avatar_url: updates.avatarUrl,
+      }).catch(() => {
+        // Non-blocking background sync
+      });
+    }
 
     if (typeof window !== 'undefined') {
       const registered = localStorage.getItem(USERS_STORAGE_KEY);
