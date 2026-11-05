@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { tenantDataService } from '@/lib/tenantData';
+import { getApprovedProperties, isSupabaseConfigured } from '@/lib/supabase';
+import { Property, FilterState } from '@/types/property';
 import { PropertyCard } from '../ui/PropertyCard';
-import { FilterState } from '@/types/property';
 import { Building2, Home, Sparkles, FilterX } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -14,16 +15,50 @@ interface FeaturedPropertiesProps {
 export const FeaturedProperties: React.FC<FeaturedPropertiesProps> = ({ externalFilter }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'residential' | 'commercial'>('all');
   const [selectedLocality, setSelectedLocality] = useState<string>('all');
+  const [properties, setProperties] = useState<Property[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchProperties() {
+      try {
+        if (isSupabaseConfigured()) {
+          const { properties: sbProps, error } = await getApprovedProperties();
+          if (!isMounted) return;
+          if (error) {
+            setProperties(tenantDataService.getPublicProperties());
+          } else {
+            setProperties(sbProps);
+          }
+        } else {
+          if (!isMounted) return;
+          setProperties(tenantDataService.getPublicProperties());
+        }
+      } catch {
+        if (!isMounted) return;
+        setProperties(tenantDataService.getPublicProperties());
+      }
+    }
+
+    fetchProperties();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Filter properties dynamically
   const filteredProperties = useMemo(() => {
-    return tenantDataService.getPublicProperties().filter((prop) => {
+    return properties.filter((prop) => {
       // External search bar override
       if (externalFilter) {
         if (externalFilter.propertyType !== 'all' && prop.type !== externalFilter.propertyType) {
           return false;
         }
-        if (externalFilter.searchLocation !== 'all' && prop.location.toLowerCase() !== externalFilter.searchLocation.toLowerCase()) {
+        if (
+          externalFilter.searchLocation !== 'all' &&
+          prop.location.toLowerCase() !== externalFilter.searchLocation.toLowerCase()
+        ) {
           return false;
         }
         const effectiveMax = externalFilter.maxRent || externalFilter.maxBudget || 0;
@@ -44,7 +79,7 @@ export const FeaturedProperties: React.FC<FeaturedPropertiesProps> = ({ external
 
       return true;
     });
-  }, [activeTab, selectedLocality, externalFilter]);
+  }, [properties, activeTab, selectedLocality, externalFilter]);
 
   return (
     <section id="properties" className="py-24 bg-[#0B111E] border-t border-white/10 relative">
@@ -71,7 +106,7 @@ export const FeaturedProperties: React.FC<FeaturedPropertiesProps> = ({ external
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
             >
-              All Listings ({tenantDataService.getPublicProperties().length})
+              All Listings ({properties.length})
             </button>
             <button
               onClick={() => setActiveTab('residential')}

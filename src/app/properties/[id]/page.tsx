@@ -3,7 +3,6 @@
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { notFound } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PropertyGallery } from '@/components/ui/PropertyGallery';
@@ -12,12 +11,10 @@ import { ScheduleVisitModal } from '@/components/ui/ScheduleVisitModal';
 import { EnquireModal } from '@/components/ui/EnquireModal';
 import { useAuth } from '@/context/AuthContext';
 import { tenantDataService } from '@/lib/tenantData';
+import { getApprovedPropertyById, isSupabaseConfigured } from '@/lib/supabase';
 import { Property } from '@/types/property';
 import {
   MapPin,
-  Bed,
-  Bath,
-  Maximize2,
   CheckCircle2,
   Phone,
   Calendar,
@@ -26,12 +23,9 @@ import {
   Share2,
   ShieldCheck,
   Building2,
-  Home,
-  Sofa,
-  Clock,
-  IndianRupee,
   Heart,
   Send,
+  Loader2,
 } from 'lucide-react';
 
 interface PropertyDetailsPageProps {
@@ -44,12 +38,62 @@ export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps
   const pathname = usePathname();
   const { user, isAuthenticated } = useAuth();
 
+  const [property, setProperty] = useState<Property | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [isEnquireModalOpen, setIsEnquireModalOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
-  const property = tenantDataService.getPropertyById(id);
+  // Fetch approved property by ID from Supabase (or fallback if not configured)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchProperty() {
+      setIsLoading(true);
+      try {
+        if (isSupabaseConfigured()) {
+          const { property: sbProp, error } = await getApprovedPropertyById(id);
+          if (!isMounted) return;
+
+          if (error) {
+            // Check fallback in case of connection error
+            const fallback = tenantDataService.getPropertyById(id);
+            if (fallback && (fallback.status === 'approved' || fallback.status === 'Published' || !fallback.status)) {
+              setProperty(fallback);
+            } else {
+              setProperty(null);
+            }
+          } else {
+            // Supabase is the primary source: only display if approved
+            setProperty(sbProp);
+          }
+        } else {
+          // Supabase is not configured (local demo mode fallback)
+          if (!isMounted) return;
+          const fallback = tenantDataService.getPropertyById(id);
+          if (fallback && (fallback.status === 'approved' || fallback.status === 'Published' || !fallback.status)) {
+            setProperty(fallback);
+          } else {
+            setProperty(null);
+          }
+        }
+      } catch {
+        if (!isMounted) return;
+        setProperty(null);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    fetchProperty();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
 
   useEffect(() => {
     if (user && property) {
@@ -57,8 +101,48 @@ export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps
     }
   }, [user, property]);
 
+  // Loading State
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col">
+        <Navbar />
+        <main className="flex-1 pt-28 pb-20 flex items-center justify-center">
+          <div className="text-center py-20">
+            <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mx-auto mb-4" />
+            <p className="text-xs text-slate-400 font-medium">Loading property details...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Not Found / Access Denied State (For missing, pending, or rejected properties)
   if (!property) {
-    notFound();
+    return (
+      <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col">
+        <Navbar />
+        <main className="flex-1 pt-28 pb-20 flex items-center justify-center">
+          <div className="text-center py-20 px-6 bg-[#0F1626] border border-white/10 rounded-3xl max-w-md mx-auto">
+            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center mx-auto mb-4">
+              <Building2 className="w-8 h-8 text-slate-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Property Not Found</h2>
+            <p className="text-xs text-slate-300 mb-6 leading-relaxed">
+              The listing you are looking for does not exist or is currently not approved for public viewing.
+            </p>
+            <Link
+              href="/properties"
+              className="inline-flex items-center space-x-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 px-6 rounded-xl text-xs transition-colors shadow-lg shadow-emerald-500/20"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to All Properties</span>
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
   }
 
   // Gallery set
@@ -66,9 +150,9 @@ export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps
 
   // Similar properties calculation
   const allProps = tenantDataService.getAllProperties();
-  const similarProperties = allProps.filter(
-    (p) => p.id !== property.id && (p.location === property.location || p.type === property.type)
-  ).slice(0, 3);
+  const similarProperties = allProps
+    .filter((p) => p.id !== property.id && (p.location === property.location || p.type === property.type))
+    .slice(0, 3);
 
   // Pre-filled WhatsApp link
   const whatsappMsg = encodeURIComponent(
@@ -107,11 +191,13 @@ export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps
           <div className="flex flex-col md:flex-row md:items-start justify-between mb-8 gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className={`text-xs font-bold px-3 py-1 rounded-md ${
-                  property.type === 'residential'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                }`}>
+                <span
+                  className={`text-xs font-bold px-3 py-1 rounded-md ${
+                    property.type === 'residential'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                  }`}
+                >
                   {property.subType}
                 </span>
                 {property.furnishing && (
@@ -274,11 +360,14 @@ export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps
                 <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
                   <div className="text-xs text-slate-400 mb-1 font-medium">Monthly Rent</div>
                   <div className="text-3xl font-black text-emerald-400">
-                    ₹{property.rent.toLocaleString('en-IN')} <span className="text-xs text-slate-300 font-normal">/ month</span>
+                    ₹{property.rent.toLocaleString('en-IN')}{' '}
+                    <span className="text-xs text-slate-300 font-normal">/ month</span>
                   </div>
                   <div className="text-xs text-slate-400 mt-2 flex items-center justify-between pt-2 border-t border-white/10">
                     <span>Security Deposit:</span>
-                    <span className="font-semibold text-white">₹{(property.securityDeposit || property.rent * 2).toLocaleString('en-IN')}</span>
+                    <span className="font-semibold text-white">
+                      ₹{(property.securityDeposit || property.rent * 2).toLocaleString('en-IN')}
+                    </span>
                   </div>
                 </div>
 
@@ -348,9 +437,7 @@ export default function PropertyDetailsPage({ params }: PropertyDetailsPageProps
           {/* Similar Properties Section */}
           {similarProperties.length > 0 && (
             <div className="mt-20 pt-12 border-t border-white/10">
-              <h2 className="text-2xl font-bold text-white mb-6">
-                Similar Properties in Gorakhpur
-              </h2>
+              <h2 className="text-2xl font-bold text-white mb-6">Similar Properties in Gorakhpur</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {similarProperties.map((simProp) => (
                   <PropertyCard key={simProp.id} property={simProp} />

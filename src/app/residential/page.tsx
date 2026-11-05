@@ -1,20 +1,53 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PropertyCard } from '@/components/ui/PropertyCard';
 import { tenantDataService } from '@/lib/tenantData';
-import { Home, Search, MapPin, Filter, RotateCcw } from 'lucide-react';
+import { getApprovedProperties, isSupabaseConfigured } from '@/lib/supabase';
+import { Property } from '@/types/property';
+import { Home, Search, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function ResidentialPage() {
   const [subCategory, setSubCategory] = useState<string>('all');
   const [selectedLocality, setSelectedLocality] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [properties, setProperties] = useState<Property[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchProperties() {
+      try {
+        if (isSupabaseConfigured()) {
+          const { properties: sbProps, error } = await getApprovedProperties();
+          if (!isMounted) return;
+          if (error) {
+            setProperties(tenantDataService.getPublicProperties());
+          } else {
+            setProperties(sbProps);
+          }
+        } else {
+          if (!isMounted) return;
+          setProperties(tenantDataService.getPublicProperties());
+        }
+      } catch {
+        if (!isMounted) return;
+        setProperties(tenantDataService.getPublicProperties());
+      }
+    }
+
+    fetchProperties();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const residentialProperties = useMemo(() => {
-    return tenantDataService.getPublicProperties().filter((p) => {
+    return properties.filter((p) => {
       if (p.type !== 'residential') return false;
 
       // SubCategory filter
@@ -40,7 +73,7 @@ export default function ResidentialPage() {
 
       return true;
     });
-  }, [subCategory, selectedLocality, searchQuery]);
+  }, [properties, subCategory, selectedLocality, searchQuery]);
 
   return (
     <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col">

@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { FilterSidebar } from '@/components/ui/FilterSidebar';
 import { FilterDrawer } from '@/components/ui/FilterDrawer';
 import { PropertyCard } from '@/components/ui/PropertyCard';
 import { tenantDataService } from '@/lib/tenantData';
-import { FilterState } from '@/types/property';
-import { Filter, Search, RotateCcw, X, Building2, Home } from 'lucide-react';
+import { getApprovedProperties, isSupabaseConfigured } from '@/lib/supabase';
+import { Property, FilterState } from '@/types/property';
+import { Filter, Search, RotateCcw, X, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const initialFilters: FilterState = {
@@ -26,12 +27,59 @@ const initialFilters: FilterState = {
 export default function PropertiesPage() {
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const resetFilters = () => setFilters(initialFilters);
 
-  // Dynamic filter engine
+  // Load approved properties from Supabase (or fallback if not configured)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchProperties() {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        if (isSupabaseConfigured()) {
+          const { properties: sbProps, error } = await getApprovedProperties();
+          if (!isMounted) return;
+
+          if (error) {
+            setLoadError('Unable to connect to database. Displaying cached listings.');
+            setProperties(tenantDataService.getPublicProperties());
+          } else {
+            // Supabase is the primary and only source when configured.
+            // Do not merge fake local properties with real Supabase records.
+            setProperties(sbProps);
+          }
+        } else {
+          // Fallback when Supabase is not configured (local demo mode)
+          if (!isMounted) return;
+          setProperties(tenantDataService.getPublicProperties());
+        }
+      } catch {
+        if (!isMounted) return;
+        setLoadError('An unexpected error occurred while loading listings.');
+        setProperties(tenantDataService.getPublicProperties());
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    fetchProperties();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Dynamic filter engine applied on loaded properties
   const filteredProperties = useMemo(() => {
-    let result = tenantDataService.getPublicProperties();
+    let result = [...properties];
 
     // Keyword Search
     if (filters.searchQuery.trim()) {
@@ -98,7 +146,7 @@ export default function PropertiesPage() {
     }
 
     return result;
-  }, [filters]);
+  }, [properties, filters]);
 
   return (
     <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col">
@@ -119,7 +167,7 @@ export default function PropertiesPage() {
           {/* Controls Bar for Mobile & Results Counter */}
           <div className="flex items-center justify-between mb-6">
             <div className="text-xs text-slate-300 font-medium">
-              Showing <span className="text-emerald-400 font-bold">{filteredProperties.length}</span> of {tenantDataService.getPublicProperties().length} rental listings
+              Showing <span className="text-emerald-400 font-bold">{filteredProperties.length}</span> of {properties.length} rental listings
             </div>
 
             <button
@@ -131,10 +179,19 @@ export default function PropertiesPage() {
             </button>
           </div>
 
+          {/* Optional Load Error Banner */}
+          {loadError && (
+            <div className="mb-6 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center space-x-2.5">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>{loadError}</span>
+            </div>
+          )}
+
           {/* Active Filter Badges */}
           {(filters.searchQuery ||
             filters.searchLocation !== 'all' ||
             filters.propertyType !== 'all' ||
+            filters.subType !== 'all' ||
             filters.minRent > 0 ||
             filters.maxRent > 0 ||
             filters.bedrooms > 0 ||
@@ -160,6 +217,13 @@ export default function PropertiesPage() {
                 <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-md flex items-center gap-1">
                   Type: {filters.propertyType}
                   <X className="w-3 h-3 cursor-pointer" onClick={() => setFilters({ ...filters, propertyType: 'all' })} />
+                </span>
+              )}
+
+              {filters.subType !== 'all' && (
+                <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-md flex items-center gap-1">
+                  Sub-Type: {filters.subType}
+                  <X className="w-3 h-3 cursor-pointer" onClick={() => setFilters({ ...filters, subType: 'all' })} />
                 </span>
               )}
 
@@ -194,7 +258,27 @@ export default function PropertiesPage() {
 
             {/* Main Property Catalog */}
             <div className="lg:col-span-3">
-              {filteredProperties.length > 0 ? (
+              {isLoading ? (
+                /* Sleek Loading Skeleton Grid */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3, 4, 5, 6].map((idx) => (
+                    <div
+                      key={idx}
+                      className="bg-[#0F1626] border border-white/10 rounded-2xl overflow-hidden animate-pulse"
+                    >
+                      <div className="h-52 bg-white/5" />
+                      <div className="p-5 space-y-3">
+                        <div className="h-4 bg-white/10 rounded w-3/4" />
+                        <div className="h-3 bg-white/5 rounded w-1/2" />
+                        <div className="pt-3 border-t border-white/5 flex items-center justify-between">
+                          <div className="h-5 bg-emerald-500/20 rounded w-1/3" />
+                          <div className="h-4 bg-white/5 rounded w-1/4" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : filteredProperties.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredProperties.map((property, idx) => (
                     <motion.div
